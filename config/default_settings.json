@@ -1,0 +1,7 @@
+{
+  "ping_count": 4,
+  "command_timeout": 10,
+  "monitor_interval": 5,
+  "report_directory": "~/Documents/KaliNet Reports",
+  "theme": "dark"
+}
