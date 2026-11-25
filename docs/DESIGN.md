@@ -4,16 +4,16 @@
 
 Students diagnosing a Kali VM network must otherwise move between several terminal utilities and interpret their output independently. KaliNet presents these observations in a single native desktop interface, makes failures readable, and keeps network operations separate from presentation.
 
-The complete project aims to support configuration inspection, connectivity diagnostics, authorized single-host scanning, periodic monitoring and exportable reports without requiring manual terminal commands for normal use. This milestone implements only the desktop foundation and configuration inspection.
+The complete project aims to support configuration inspection, connectivity diagnostics, authorized single-host scanning, periodic monitoring and exportable reports without requiring manual terminal commands for normal use. This milestone implements the desktop foundation, configuration inspection and Phase 3 diagnostics; live Kali acceptance is pending.
 
 ## Requirements and milestone boundaries
 
 | Module | Required behavior | Current milestone |
 | --- | --- | --- |
 | Desktop shell | Dark theme, seven pages, header, progress, responsive navigation | Implemented |
-| Dashboard | Host, interface, address, gateway, DNS, connectivity and counts | Implemented; diagnostic timestamp reserved |
+| Dashboard | Host, interface, address, gateway, DNS, connectivity and counts | Implemented; diagnostic timestamp tracks last completed attempt |
 | Network information | Addresses, MAC, states, routing, DNS and traffic counters | Implemented |
-| Diagnostics | Validated ping, traceroute and DNS lookup | Phase 3 |
+| Diagnostics | Validated ping, traceroute and DNS lookup | Implemented; Kali acceptance pending |
 | Scanner | Authorized literal single-IP Nmap scan, XML, cancellation | Phase 4 |
 | Monitor/reports | Periodic history, CSV/TXT/JSON exports | Phase 5 |
 | Settings | Per-user JSON configuration, validation, editor | Persistence implemented; editor Phase 5 |
@@ -50,7 +50,8 @@ The GUI schedules exactly one collection worker at a time. Repeated refresh clic
 | `ip -j route` / `ip -j -6 route` | Inspect main IPv4/IPv6 route tables |
 | `ip -s link` | Show raw link counters and status |
 | `resolvectl dns` | Retrieve per-link/system resolver addresses if available |
-| `/etc/resolv.conf` | DNS nameserver fallback; may show a stub |
+| `/etc/resolv.conf` | Existing resolver configuration; may show a stub |
+| `nmcli --terse --escape no --fields IP4.DNS,IP6.DNS device show` | Optional NetworkManager DNS data, labeled separately |
 | `ss -H -lntu` | Count TCP listening and UDP bound socket entries |
 | `ping -n -c 1 -W 2 1.1.1.1` | Single bounded ICMP connectivity observation |
 | `psutil.net_io_counters(pernic=True)` | Cumulative bytes, packets, errors and drops |
@@ -70,7 +71,9 @@ Missing information is shown as unavailable. The GUI does not infer zero listene
 
 ## Planned security boundary
 
-Later diagnostics require hostname/IP validation before constructing argument lists. Later scans will accept loopback or one literal IP address, require explicit authorization for non-loopback targets, use unprivileged TCP connect scans and safe XML parsing, and forbid ranges, stealth/exploits and credentials. These are requirements for later milestones, not implemented features of this release.
+Diagnostics validate a single ASCII hostname or IPv4/IPv6 literal before constructing argument lists. Prefix options, shell syntax, URLs, ranges and scoped IPv6 input are rejected. A separate diagnostics worker communicates through a queue and supports cancellation; application shutdown waits for both collection and diagnostic workers. The command runner preserves captured output on timeout, cancellation and nonzero exit. Parsers extract packet summaries, hop observations and DNS answer records while retaining raw output. DNS response codes are checked independently of dig's process exit status. One diagnostic is allowed at a time.
+
+Later scans will accept loopback or one literal IP address, require explicit authorization for non-loopback targets, use unprivileged TCP connect scans and safe XML parsing, and forbid ranges, stealth/exploits and credentials. Scanning remains unimplemented and Phase 4 must wait for Phase 3 verification.
 
 ## Visual design
 

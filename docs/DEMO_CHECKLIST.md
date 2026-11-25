@@ -11,10 +11,12 @@
 - Demonstrate an error case using the test plan's restricted-PATH launch or disconnected virtual NIC, then restore normal conditions.
 - Explain the difference between no ICMP reply and confirmed Internet failure.
 - Show Settings and the per-user log; close during refresh to demonstrate cleanup.
+- Run Ping on `127.0.0.1` and `::1`, Traceroute on `127.0.0.1`, and DNS Lookup on `example.com`.
+- Show parsed results and raw outputs; reject `example.com; id` without starting a command.
+- Stop a long diagnostic and navigate during execution. Complete [Phase 3 acceptance](PHASE3_VERIFICATION.md) before Phase 4.
 
 ## Full-project demonstration — blocked on later implementation
 
-- Run user-selected ping, traceroute and DNS lookup (Phase 3).
 - Explain single-host authorization rules and perform an authorized localhost scan (Phase 4).
 - Start/stop connectivity monitoring (Phase 5).
 - Export a report and open the exported CSV/TXT/JSON (Phase 5).

@@ -12,6 +12,7 @@ class DashboardPage(ttk.Frame):
         cards = ttk.Frame(self)
         cards.pack(fill="x")
         self.values = {}
+        self.last_diagnostic = "Not run"
         labels = [("hostname", "HOSTNAME"), ("active_interface", "ACTIVE INTERFACE"),
                   ("ipv4", "IPv4 ADDRESS"), ("gateway", "DEFAULT GATEWAY"),
                   ("dns_servers", "DNS SERVERS"), ("connectivity", "INTERNET PROBE"),
@@ -35,7 +36,7 @@ class DashboardPage(ttk.Frame):
     def update_snapshot(self, snapshot):
         values = {**snapshot, "interface_count": len(snapshot["interfaces"]),
                   "dns_servers": ", ".join(snapshot["dns_servers"]),
-                  "last_diagnostic": "Not run (future phase)"}
+                  "last_diagnostic": self.last_diagnostic}
         for key, variable in self.values.items():
             value = values.get(key)
             variable.set("Unavailable" if value is None or value == "" else str(value))
@@ -46,3 +47,7 @@ class DashboardPage(ttk.Frame):
         if snapshot["warnings"]:
             notes.append("\nCollection warnings:\n" + "\n".join(snapshot["warnings"]))
         set_text(self.notes, "\n\n".join(notes))
+
+    def set_last_diagnostic(self, timestamp):
+        self.last_diagnostic = timestamp
+        self.values["last_diagnostic"].set(timestamp)

@@ -35,12 +35,14 @@ def test_no_shell_and_locale():
 def test_timeout_kills_and_reaps():
     process = fake_process()
     process.poll.return_value = None
-    process.communicate.side_effect = [subprocess.TimeoutExpired("ip", .15), ("", "")]
+    process.communicate.side_effect = [subprocess.TimeoutExpired("ip", .15), ("partial output", "partial error")]
     with patch("app.utils.command_runner.shutil.which", return_value="/usr/bin/ip"), \
             patch("app.utils.command_runner.subprocess.Popen", return_value=process), \
             patch("app.utils.command_runner.time.monotonic", side_effect=[0, 0, 2]):
-        with pytest.raises(CommandError, match="timed out"):
+        with pytest.raises(CommandError, match="timed out") as caught:
             CommandRunner().run(["ip"], timeout=1)
+    assert caught.value.result.stdout == "partial output"
+    assert caught.value.result.stderr == "partial error"
     process.kill.assert_called_once()
     assert process.communicate.call_count == 2
 

@@ -6,11 +6,14 @@ Run `python -m pytest -q` and `python -m compileall -q main.py app tests` from t
 
 | Test file | Coverage |
 | --- | --- |
-| `test_command_runner.py` | Missing executable, argument-list/no-shell invocation, locale, deadline cleanup, cancellation, permission error, failed exit |
+| `test_command_runner.py` | Missing executable, argument-list/no-shell invocation, locale, deadline cleanup with partial output, cancellation, permission error, failed exit |
 | `test_config.py` | Invalid types/ranges/paths/theme, initial creation, persistence, corrupt-file preservation, packaged-default agreement |
-| `test_network.py` | Address/DNS parsing, malformed interface output, resolver fallback, snapshot fields, missing sources, cancellation |
+| `test_network.py` | Address/DNS parsing, malformed output, resolver-file/NetworkManager sources, optional provider behavior, socket counting, snapshot fields, missing sources, cancellation |
+| `test_validators.py` | IPv4/IPv6/hostname acceptance, malformed inputs, injection/option rejection, packet counts |
+| `test_diagnostics.py` | Command arguments, ping statistics, hops, DNS answers/status/NODATA, malformed output, partial timeout and error reporting |
+| `test_gui_diagnostics.py` | Real Tk event loop with mocked services: results, timestamp, input rejection, navigation, duplicate-run prevention, cancellation and shutdown |
 
-No live network is required by these tests. Mocked command results validate service logic, not actual Linux utility compatibility or rendered Tk layouts. Diagnostic input validation, ping parsing, Nmap parsing and report generation tests belong to later phases and are not present yet.
+No live network is required by these tests. Mocked command results validate service logic, not actual Linux utility compatibility. Tk tests skip when desktop/Tcl initialization is unavailable; they do not replace an Xfce visual review. Nmap parsing and report tests belong to later phases. Follow [PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md) for diagnostic acceptance and the `ss -tuln` comparison.
 
 ## Kali Linux manual acceptance
 
@@ -19,9 +22,9 @@ Record date, Kali/Python versions, VMware network mode, actual results and pass/
 | ID | Procedure | Expected outcome |
 | --- | --- | --- |
 | M01 | Install and launch in Xfce without sudo | Native dark window, initial collection, no credential prompt |
-| M02 | Visit all seven pages | Correct titles, selected navigation, clear placeholders |
+| M02 | Visit all seven pages | Correct titles, selected navigation, diagnostics tools and clearly labeled remaining placeholders |
 | M03 | Compare `ip -j addr` and `ip -j route` with GUI | Matching interfaces/addresses and appropriate gateway |
-| M04 | Compare DNS using `resolvectl dns` or `/etc/resolv.conf` | Correct source/servers, fallback warning if appropriate |
+| M04 | Compare DNS using available `resolvectl`, `nmcli` and `/etc/resolv.conf` | Correct source labels/servers; no dashboard warning for absent optional tools |
 | M05 | Compare `ss -H -lntu` row count with dashboard | Matching socket count, allowing for live socket changes |
 | M06 | Refresh repeatedly and navigate during collection | No freezing, no duplicate concurrent collections |
 | M07 | Disconnect VMware virtual NIC, refresh, then reconnect | Missing routes/addresses or no reply displayed without crash; recovery after refresh |
@@ -45,3 +48,16 @@ Executed on 2026-11-04 in a project-local virtual environment with Python 3.14.5
 - `python -m compileall -q main.py app tests`: completed with no errors.
 
 These results verify mocked service behavior on Windows, not a complete Kali desktop acceptance run.
+
+### Phase 3 verification — 2026-11-04
+
+Executed on the same Windows Python 3.14.5 host after the Phase 3 changes:
+
+- Full suite: **100 passed, 1 skipped in 1.21s**. The invalid-input GUI test skipped because a repeated Tk initialization could not read the host's `init.tcl`.
+- That skipped GUI test rerun alone in a fresh process: **1 passed in 0.33s**.
+- Python compilation of `main.py`, `app`, and `tests`: passed.
+- `git diff --check`: passed (Git emitted only Windows line-ending notices).
+
+The full suite used `-p no:cacheprovider` and a newly allocated `--basetemp` path because pre-existing Windows pytest/cache directories had incompatible access permissions. Earlier setup/teardown errors were addressed before the final run. GUI tests exercised real Tk widgets and event-loop callbacks with mocked diagnostic services, not live Linux utilities.
+
+The user reported a working v0.2.0 dashboard in Kali; this session did not independently inspect that VM. **The guest's zero-socket observation has not been verified against live `ss -tuln`.** The original selection flags are equivalent; revised parsing, retained raw output and a controlled listener procedure make the comparison testable. **Live Phase 3 Kali/Xfce acceptance remains pending.** Do not proceed to Phase 4 until the acceptance procedure is completed and reviewed.

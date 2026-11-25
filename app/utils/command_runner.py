@@ -11,7 +11,9 @@ LOG = logging.getLogger("kalinet.commands")
 
 
 class CommandError(RuntimeError):
-    pass
+    def __init__(self, message, result=None):
+        super().__init__(message)
+        self.result = result
 
 
 class CommandCancelled(CommandError):
@@ -35,13 +37,14 @@ class CommandRunner:
             raise ValueError("Command timeout must be between 0 and 120 seconds.")
         cancel = cancel if cancel is not None else threading.Event()
         if cancel.is_set():
-            raise CommandCancelled("Refresh cancelled.")
+            raise CommandCancelled("Operation cancelled.")
         executable = shutil.which(args[0])
         if not executable:
             message = f"Required utility '{args[0]}' is missing. See installation instructions."
             LOG.warning(message)
             raise CommandError(message)
         process = None
+        reaped = False
         try:
             process = subprocess.Popen([executable, *args[1:]], shell=False,
                                        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -50,19 +53,28 @@ class CommandRunner:
             deadline = time.monotonic() + timeout
             while True:
                 if cancel.is_set():
-                    raise CommandCancelled("Refresh cancelled.")
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                    reaped = True
+                    raise CommandCancelled("Operation cancelled.", CommandResult(
+                        tuple(args), process.returncode, stdout, stderr))
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise CommandError(f"{args[0]} timed out after {timeout:g} seconds.")
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                    reaped = True
+                    raise CommandError(f"{args[0]} timed out after {timeout:g} seconds.",
+                                       CommandResult(tuple(args), process.returncode, stdout, stderr))
                 try:
                     stdout, stderr = process.communicate(timeout=min(0.15, remaining))
+                    reaped = True
                     break
                 except subprocess.TimeoutExpired:
                     continue
             result = CommandResult(tuple(args), process.returncode, stdout, stderr)
             if result.returncode not in accepted_codes:
                 detail = stderr.strip() or stdout.strip() or "No error details returned."
-                raise CommandError(f"{args[0]} failed (exit {result.returncode}): {detail[:500]}")
+                raise CommandError(f"{args[0]} failed (exit {result.returncode}): {detail[:500]}", result)
             return result
         except OSError as exc:
             LOG.warning("Could not execute %s: %s", args[0], exc)
@@ -71,6 +83,6 @@ class CommandRunner:
             LOG.warning("%s", exc)
             raise
         finally:
-            if process is not None and process.poll() is None:
+            if process is not None and not reaped and process.poll() is None:
                 process.kill()
                 process.communicate()

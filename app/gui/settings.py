@@ -12,7 +12,8 @@ class SettingsPage(ttk.Frame):
         lines = [f"Configuration file: {config.path}", "", "Effective settings:"]
         lines.extend(f"{key}: {value}" for key, value in settings.items())
         lines.extend(["", "For now, edit the JSON file while KaliNet is closed, then restart.",
-                      "Command timeout applies per command. Other defaults are reserved for later modules."])
+                      "Command timeout applies per command. Ping packet count sets the diagnostics default.",
+                      "Monitoring and report defaults are reserved for later modules."])
         if config.warning:
             lines.extend(["", config.warning])
         set_text(text, "\n".join(lines))

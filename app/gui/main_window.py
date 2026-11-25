@@ -8,6 +8,7 @@ from tkinter import ttk
 from app.core.config_service import ConfigService
 from app.core.network_utils import NetworkService
 from app.gui.dashboard import DashboardPage
+from app.gui.diagnostics import DiagnosticsPage
 from app.gui.network_info import NetworkInfoPage
 from app.gui.placeholder import PlaceholderPage
 from app.gui.settings import SettingsPage
@@ -63,6 +64,12 @@ class MainWindow(tk.Tk):
         style.configure("TNotebook.Tab", background=PANEL, foreground=FG, padding=(10, 8))
         style.map("TNotebook.Tab", background=[("selected", "#155b77")])
         style.configure("Horizontal.TProgressbar", background=CYAN, troughcolor=PANEL)
+        for name in ("TEntry", "TSpinbox", "TCombobox"):
+            style.configure(name, fieldbackground=PANEL, foreground=FG, insertcolor=FG)
+            style.map(name, fieldbackground=[("readonly", PANEL), ("disabled", BG)],
+                      foreground=[("readonly", FG), ("disabled", MUTED)])
+        self.option_add("*TCombobox*Listbox.background", PANEL)
+        self.option_add("*TCombobox*Listbox.foreground", FG)
 
     def _layout(self):
         header = ttk.Frame(self, padding=(20, 14))
@@ -93,7 +100,7 @@ class MainWindow(tk.Tk):
         self.pages = {
             "Dashboard": DashboardPage(content, self.refresh),
             "Network Information": NetworkInfoPage(content, self.refresh),
-            "Network Diagnostics": PlaceholderPage(content, "Network diagnostics", "Phase 3: validated ping, traceroute, and DNS lookup."),
+            "Network Diagnostics": DiagnosticsPage(content, self.settings, self._diagnostic_completed),
             "Port Scanner": PlaceholderPage(content, "Port scanner", "Phase 4: authorized single-host Nmap scans, XML results, and cancellation."),
             "Network Monitor": PlaceholderPage(content, "Network monitor", "Phase 5: periodic connectivity checks and monitoring history."),
             "Reports": PlaceholderPage(content, "Reports", "Phase 5: export results as CSV, TXT, and JSON."),
@@ -105,9 +112,12 @@ class MainWindow(tk.Tk):
             button = ttk.Button(sidebar, text=name, command=lambda name=name: self.show_page(name))
             button.pack(fill="x", pady=4)
             self.navigation[name] = button
-        ttk.Label(sidebar, text="v0.2.0 • Phases 1–2\nStandard user access", style="Muted.TLabel").pack(
+        ttk.Label(sidebar, text="v0.3.0 • Phases 1–3\nStandard user access", style="Muted.TLabel").pack(
             side="bottom", anchor="w", padx=12, pady=12)
         self.show_page("Dashboard")
+
+    def _diagnostic_completed(self, timestamp):
+        self.pages["Dashboard"].set_last_diagnostic(timestamp)
 
     def show_page(self, name):
         self.pages[name].tkraise()
@@ -159,6 +169,7 @@ class MainWindow(tk.Tk):
             return
         self.closing = True
         self.cancel.set()
+        self.pages["Network Diagnostics"].shutdown()
         self.after_cancel(self.poll_id)
         self.progress.stop()
         self.refresh_button.configure(state="disabled")
@@ -166,7 +177,7 @@ class MainWindow(tk.Tk):
         self._wait_for_worker()
 
     def _wait_for_worker(self):
-        if self.worker is not None and self.worker.is_alive():
+        if (self.worker is not None and self.worker.is_alive()) or self.pages["Network Diagnostics"].is_running():
             self.after(50, self._wait_for_worker)
         else:
             self.destroy()

@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 import socket
+import shutil
 
 import psutil
 
@@ -62,18 +63,57 @@ def parse_nameservers(output, resolvectl=False):
     return servers
 
 
+def count_listening_sockets(output):
+    """Count ss TCP/UDP entries, allowing its optional header but no unknown rows."""
+    count = 0
+    for line in output.splitlines():
+        fields = line.split()
+        if not fields or fields[0] == "Netid":
+            continue
+        if len(fields) < 6 or fields[0] not in ("tcp", "udp", "tcp6", "udp6"):
+            raise ValueError("Unrecognized ss output; socket count is unavailable.")
+        count += 1
+    return count
+
+
 class NetworkService:
     def __init__(self, runner=None, resolv_conf=None):
         self.runner = runner or CommandRunner()
         self.resolv_conf = Path(resolv_conf or "/etc/resolv.conf")
 
+    def detect_dns(self, timeout, cancel):
+        """Preserve resolver-file observations and label optional upstream sources."""
+        sources, notes = {}, []
+        try:
+            servers = parse_nameservers(self.resolv_conf.read_text(encoding="utf-8"))
+            if servers:
+                sources[str(self.resolv_conf)] = servers
+        except (OSError, UnicodeError) as exc:
+            notes.append(f"{self.resolv_conf}: {exc}")
+        providers = [(["resolvectl", "dns"], True),
+                     (["nmcli", "--terse", "--escape", "no", "--fields", "IP4.DNS,IP6.DNS", "device", "show"], True)]
+        for args, labeled in providers:
+            if not shutil.which(args[0]):
+                continue  # Optional source, not a missing dependency.
+            try:
+                result = self.runner.run(args, timeout=timeout, cancel=cancel)
+                servers = parse_nameservers(result.stdout, labeled)
+                if servers:
+                    sources[" ".join(args)] = servers
+            except CommandCancelled:
+                raise
+            except CommandError as exc:
+                notes.append(str(exc))
+        servers = list(dict.fromkeys(server for values in sources.values() for server in values))
+        return servers, sources, notes
+
     def collect(self, timeout=10, cancel=None):
         snapshot = {
             "hostname": socket.gethostname(), "interfaces": [], "routes": [],
-            "dns_servers": [], "dns_source": "Unavailable", "statistics": {},
+            "dns_servers": [], "dns_source": "Unavailable", "dns_sources": {}, "dns_notes": [], "statistics": {},
             "link_statistics": "", "listening_ports": None, "active_interface": None,
             "ipv4": None, "gateway": None, "connectivity": "Unknown",
-            "probe_target": PROBE_TARGET, "warnings": [],
+            "probe_target": PROBE_TARGET, "warnings": [], "socket_output": None,
         }
 
         def attempt(label, action, default=None):
@@ -119,23 +159,20 @@ class NetworkService:
         if chosen:
             snapshot["gateway"] = chosen.get("gateway") or "Direct default route"
 
-        # resolvectl may be installed without a running systemd-resolved service.
-        dns = attempt("System resolver (falling back to resolv.conf if unavailable)",
-                      lambda: parse_nameservers(run(["resolvectl", "dns"]).stdout, True), [])
-        if dns:
-            snapshot["dns_servers"], snapshot["dns_source"] = dns, "resolvectl dns"
-        else:
-            snapshot["dns_servers"] = attempt("DNS configuration", lambda:
-                parse_nameservers(self.resolv_conf.read_text(encoding="utf-8")), [])
-            snapshot["dns_source"] = str(self.resolv_conf)
+        dns, sources, notes = self.detect_dns(timeout, cancel)
+        snapshot.update(dns_servers=dns, dns_sources=sources, dns_notes=notes,
+                        dns_source="; ".join(sources) or "Unavailable")
+        if not dns:
+            snapshot["warnings"].append("No DNS servers found in resolver configuration or available providers.")
 
         def counters():
             return {name: counter._asdict() for name, counter in
                     psutil.net_io_counters(pernic=True).items()}
         snapshot["statistics"] = attempt("Network counters", counters, {})
-        # Each nonempty ss row is a TCP listener or bound UDP socket, not a unique port.
-        snapshot["listening_ports"] = attempt("Local sockets", lambda:
-            len([line for line in run(["ss", "-H", "-lntu"]).stdout.splitlines() if line.strip()]))
+        def sockets():
+            snapshot["socket_output"] = run(["ss", "-H", "-lntu"]).stdout
+            return count_listening_sockets(snapshot["socket_output"])
+        snapshot["listening_ports"] = attempt("Local sockets", sockets)
         probe = attempt("Connectivity probe", lambda:
             run(["ping", "-n", "-c", "1", "-W", "2", PROBE_TARGET], (0, 1)))
         if probe is not None:

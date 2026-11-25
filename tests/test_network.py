@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from app.core.network_utils import NetworkService, parse_interfaces, parse_nameservers
+from app.core.network_utils import NetworkService, parse_interfaces, parse_nameservers, count_listening_sockets
 from app.utils.command_runner import CommandCancelled, CommandError, CommandResult
 
 ADDRESSES = json.dumps([
@@ -45,7 +45,7 @@ def test_collection_and_dns_fallback(tmp_path):
             ("ip", "-j", "route"): '[{"dst":"default","gateway":"192.0.2.1","dev":"eth0"}]',
             ("ip", "-j", "-6", "route"): "[]",
             ("ip", "-s", "link"): "link statistics",
-            ("ss", "-H", "-lntu"): "tcp LISTEN ...\nudp UNCONN ...\n",
+            ("ss", "-H", "-lntu"): "tcp LISTEN 0 128 127.0.0.1:22 0.0.0.0:*\nudp UNCONN 0 0 *:5353 *:*\n",
         }
         return CommandResult(tuple(args), 1 if args[0] == "ping" else 0, outputs.get(tuple(args), ""), "")
     runner = Mock()
@@ -76,3 +76,54 @@ def test_cancel_propagates():
     runner.run.side_effect = CommandCancelled("cancelled")
     with pytest.raises(CommandCancelled):
         NetworkService(runner).collect()
+
+
+@pytest.mark.parametrize("header", ["", "Netid State Recv-Q Send-Q Local Address:Port Peer Address:Port\n"])
+def test_ss_matches_headerless_and_tuln(header):
+    rows = "udp UNCONN 0 0 0.0.0.0:5353 0.0.0.0:*\ntcp LISTEN 0 128 [::]:22 [::]:*\n"
+    assert count_listening_sockets(header + rows) == 2
+
+
+@pytest.mark.parametrize("output", ["", "\n", "Netid State Recv-Q Send-Q Local Address:Port Peer Address:Port\n"])
+def test_ss_zero_is_valid(output):
+    assert count_listening_sockets(output) == 0
+
+
+def test_ss_malformed_is_not_zero():
+    with pytest.raises(ValueError, match="Unrecognized"):
+        count_listening_sockets("unexpected text")
+
+
+def test_dns_missing_optional_providers_is_normal(tmp_path):
+    resolv = tmp_path / "resolv.conf"
+    resolv.write_text("nameserver 192.0.2.53\n")
+    runner = Mock()
+    with patch("app.core.network_utils.shutil.which", return_value=None):
+        servers, sources, notes = NetworkService(runner, resolv).detect_dns(10, None)
+    assert servers == ["192.0.2.53"]
+    assert notes == []
+    assert sources == {str(resolv): servers}
+    runner.run.assert_not_called()
+
+
+def test_networkmanager_and_stub_sources(tmp_path):
+    resolv = tmp_path / "resolv.conf"
+    resolv.write_text("nameserver 127.0.0.53\n")
+    runner = Mock()
+    runner.run.return_value = CommandResult((), 0, "IP4.DNS[1]:192.0.2.53\nIP6.DNS[1]:2001:db8::53\n", "")
+    with patch("app.core.network_utils.shutil.which", side_effect=lambda name: name if name == "nmcli" else None):
+        servers, sources, notes = NetworkService(runner, resolv).detect_dns(10, None)
+    assert servers == ["127.0.0.53", "192.0.2.53", "2001:db8::53"]
+    assert len(sources) == 2
+    assert notes == []
+
+
+def test_inactive_provider_preserves_resolver_file(tmp_path):
+    resolv = tmp_path / "resolv.conf"
+    resolv.write_text("nameserver 192.0.2.53\n")
+    runner = Mock()
+    runner.run.side_effect = CommandError("service inactive")
+    with patch("app.core.network_utils.shutil.which", return_value="available"):
+        servers, _, notes = NetworkService(runner, resolv).detect_dns(10, None)
+    assert servers == ["192.0.2.53"]
+    assert notes

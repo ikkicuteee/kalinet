@@ -21,6 +21,8 @@ class NetworkInfoPage(ttk.Frame):
         tabs.add(frame, text=" Routing & DNS ")
         frame, self.links = text_view(tabs)
         tabs.add(frame, text=" Link details ")
+        frame, self.sockets = text_view(tabs)
+        tabs.add(frame, text=" Local sockets ")
         self.status = ttk.Label(self, text="No snapshot yet", style="Muted.TLabel")
         self.status.pack(anchor="w", pady=(12, 0))
 
@@ -38,10 +40,17 @@ class NetworkInfoPage(ttk.Frame):
         lines = [f"Default gateway: {snapshot['gateway'] or 'Unavailable'}",
                  f"DNS source: {snapshot['dns_source']}",
                  f"DNS servers: {', '.join(snapshot['dns_servers']) or 'Unavailable'}",
-                 "A loopback nameserver may be a local DNS stub resolver.", "", "IPv4 and IPv6 routes:"]
+                 "A loopback nameserver may be a local DNS stub resolver. Sources below may include upstream servers."]
+        lines.extend(f"{source}: {', '.join(servers)}" for source, servers in snapshot.get("dns_sources", {}).items())
+        lines.extend(snapshot.get("dns_notes", []))
+        lines.extend(["", "IPv4 and IPv6 routes:"])
         lines.extend("  ".join(f"{key}={value}" for key, value in route.items()) for route in snapshot["routes"])
         if snapshot["warnings"]:
             lines.extend(["", "Collection warnings:", *snapshot["warnings"]])
         set_text(self.routes, "\n".join(lines))
         set_text(self.links, snapshot["link_statistics"])
+        raw = snapshot.get("socket_output")
+        set_text(self.sockets, "Command: ss -H -lntu (same selection as ss -tuln, without header)\n"
+                 f"Collected: {snapshot['collected_at']}\nCount: {snapshot['listening_ports']}\n\n" +
+                 (raw if raw else ("No TCP/UDP listening socket entries returned." if raw == "" else "Collection failed; inspect warnings.")))
         self.status.configure(text=f"Collected: {snapshot['collected_at']} • Counters are cumulative, not rates.")

@@ -2,7 +2,7 @@
 
 CIT 244 Linux Final Project. Native Python/Tkinter desktop application for Kali Linux with Xfce, including Kali running inside VMware Workstation.
 
-**Current milestone: Phases 1 and 2.** Dashboard and network information are implemented. Diagnostics, Nmap scanning, continuous monitoring, report exports, and the settings editor are not yet implemented. Their navigation pages state this explicitly. No results are simulated.
+**Current version: v0.3.0, Phases 1–3.** Dashboard, network information, Ping, Traceroute, and DNS Lookup are implemented. Phase 3 awaits live acceptance in Kali. Nmap scanning, continuous monitoring, report exports, and the settings editor remain unimplemented. No results are simulated.
 
 ## Installation on Kali Linux
 
@@ -10,7 +10,7 @@ Copy the `kalinet` folder into your Kali home directory, so the entry point is `
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-tk iproute2 iputils-ping
+sudo apt install -y python3 python3-venv python3-tk iproute2 iputils-ping traceroute dnsutils
 cd ~/kalinet
 python3 -m venv .venv
 source .venv/bin/activate
@@ -20,12 +20,12 @@ python main.py
 
 Python 3.10 or newer is the project target. Run from an active Xfce desktop session as your normal user. Do not use `sudo python main.py`. Native Tkinter/ttk provides the charcoal, blue, and cyan interface without browser technology or optional styling dependencies. ttk panels use rectangular native geometry.
 
-`resolvectl` is optional: if it is missing or its service is inactive, KaliNet reads `/etc/resolv.conf`. This may show a local stub resolver rather than an upstream server. Do not change your system DNS services merely to enable this optional information source.
+KaliNet reads `/etc/resolv.conf` and supplements it with `resolvectl dns` and NetworkManager's `nmcli` when available. Missing optional utilities are not dashboard errors. Each source is labeled in Routing & DNS; the combined list may contain both local stub and upstream servers, and is not a claim about resolver priority. Do not install systemd-resolved or change your DNS services for this application.
 
-For later milestones, the planned utility packages are:
+For the later scanner milestone, the planned utility package is:
 
 ```bash
-sudo apt install -y traceroute dnsutils nmap
+sudo apt install -y nmap
 ```
 
 Installing these packages does not enable the unfinished pages.
@@ -47,8 +47,10 @@ python main.py
 - A single ICMP Internet probe to `1.1.1.1` on startup and each refresh. It sends real traffic; there is no continuous monitoring yet. No reply may indicate ICMP filtering rather than an Internet outage.
 - Partial results with warnings when commands fail; rotating logs; validated JSON configuration.
 - Background collection with a main-thread event queue and shutdown cancellation.
+- Ping with configurable packet count and loss/latency summaries; traceroute with numbered hops; DNS lookup with a record-type selector and response status.
+- Validated single targets, command output, cancellation and partial results after timeout. The diagnostic timestamp records the last completed attempt in this session, including failed or cancelled attempts.
 
-Listening-socket count includes TCP listeners and UDP bound sockets, with separate IPv4/IPv6 entries. It is not a count of unique port numbers. Active interface selection is a default-route heuristic; policy routing and multi-homed systems may require inspecting the detailed route table. Traffic counters are cumulative since interface/system initialization, not throughput rates. Last diagnostic/scan remains “Not run” until those modules exist; snapshot time is displayed separately.
+Listening-socket count includes TCP listeners and UDP bound sockets, with separate IPv4/IPv6 entries. It is not a count of unique port numbers. The Local sockets tab exposes `ss -H -lntu` output for comparison with `ss -tuln`: zero is valid when no entries exist, while failures show unavailable. Active interface selection is a default-route heuristic; policy routing and multi-homed systems may require inspecting the detailed route table. Traffic counters are cumulative since interface/system initialization, not throughput rates.
 
 ## Configuration and logs
 
@@ -59,7 +61,7 @@ Edit the user JSON while the application is closed. Validation requires:
 | Setting | Allowed values | Current use |
 | --- | --- | --- |
 | `command_timeout` | Integer 1–60 seconds | Per Linux command |
-| `ping_count` | Integer 1–20 | Reserved for Phase 3 |
+| `ping_count` | Integer 1–20 | Default diagnostic packet count |
 | `monitor_interval` | Integer 1–3600 seconds | Reserved for Phase 5 |
 | `report_directory` | Absolute path or `~/…` | Reserved for Phase 5 |
 | `theme` | `dark` | Current theme |
@@ -76,7 +78,7 @@ python -m pytest -q
 python -m compileall -q main.py app tests
 ```
 
-Tests use mocked processes and network counters, with no network probes. They cover command timeout, cancellation, missing utilities, permission errors, interface/DNS parsing, partial collection, configuration validation and persistence. The later hostname/IP-input, diagnostic parsing, Nmap XML, and report tests will be added with those modules. See [TEST_PLAN.md](docs/TEST_PLAN.md) for verification status and Kali acceptance tests.
+Tests use mocked processes and network counters, with no network probes. They cover input validation, diagnostic parsers, DNS provider fallback, socket counts, command timeout/partial output, cancellation, configuration and GUI worker behavior. Tk tests skip when a desktop/Tcl installation is unavailable. Nmap XML and report tests remain future work. See [TEST_PLAN.md](docs/TEST_PLAN.md) and [Phase 3 acceptance commands](docs/PHASE3_VERIFICATION.md).
 
 ## Project map
 
@@ -84,8 +86,10 @@ Tests use mocked processes and network counters, with no network probes. They co
 main.py                       Linux entry point
 app/gui/                      Desktop shell, dashboard, network view, placeholders
 app/core/network_utils.py     Linux snapshot collection and parsing
+app/core/diagnostics_service.py Ping/traceroute/dig and result parsing
 app/core/config_service.py    Configuration validation and persistence
 app/utils/command_runner.py   Safe, bounded, cancellable subprocess execution
+app/utils/validators.py       Single hostname/IP and packet-count validation
 app/utils/logger.py           Rotating per-user logs
 config/default_settings.json  Documented default configuration
 tests/                        Mocked unit tests
@@ -102,7 +106,8 @@ docs/                         Design, user manual, tests and demo checklist
 | Required utility missing | Install the packages above; inspect the warning for the utility name. |
 | No IPv4/default gateway | Check VMware's virtual NIC is connected and Kali's NetworkManager connection is active. |
 | Internet probe gets no reply | Inspect routes and VMware NAT/bridged settings; ICMP may be filtered. |
-| `resolvectl` warning | The `/etc/resolv.conf` fallback is expected on systems without systemd-resolved. |
+| DNS details mention an inactive provider | Existing resolver-file data is still retained; installing systemd-resolved is unnecessary. |
+| Traceroute stops before reaching target | Increase `command_timeout` up to 60 seconds in user settings and restart. Asterisks indicate unanswered probes. |
 | Slow refresh | Timeout is per command; collection performs several commands sequentially. Navigation remains available. |
 | Cannot initialize log/config storage | Check permissions and free space in the user's XDG directories. |
 
