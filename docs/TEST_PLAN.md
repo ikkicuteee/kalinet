@@ -77,4 +77,16 @@ The user explicitly authorized Phase 4 implementation on this date, superseding 
 - `git diff --check`: passed.
 - Tests used a fresh temporary directory and `-p no:cacheprovider` to avoid pre-existing Windows cache permission issues.
 
-Kali/Xfce visual acceptance and actual Nmap behavior remain pending. Run the Phase 4 acceptance procedure, including `KALINET_LIVE_TESTS=1 python -m pytest -q tests/test_scanner_integration.py`, inside Kali and record actual results. Phase 5 is not implemented and must wait for instruction.
+Kali/Xfce visual acceptance and actual Nmap behavior were pending at the close of Phase 4. Run the Phase 4 acceptance procedure inside Kali to record guest results.
+
+### Phase 5 verification — 2026-11-26
+
+The full Windows test run recorded **185 passed, 0 failed, 3 skipped** in 6.61 seconds. One existing diagnostics GUI test skipped during repeated Tcl initialization and passed in a fresh process (1 passed in 0.48 seconds). The other skips were the Linux loopback ping test and the opt-in Linux Nmap test. Compilation and `pip check` passed.
+
+| Test file | Coverage |
+| --- | --- |
+| `test_monitor.py` | Serial start and stop, interruptible interval, cancellation during ping, duplicate starts, restart, missing utility, failed and timed-out probes, sample counts, invalid inputs and Linux loopback integration |
+| `test_phase5_reports.py` | Old JSON configuration migration, invalid targets, reopening all four module results from SQLite, all three export formats, empty rows and filesystem failure |
+| `test_gui_phase5.py` | Settings applied through the GUI, live Matplotlib data, missing dependencies, CSV and JSON exports, report selection, shutdown during monitoring and final history persistence |
+
+[Phase 5 guest acceptance](PHASE5_VERIFICATION.md) includes commands and expected observations for Kali/Xfce. Live guest results are pending.

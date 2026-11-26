@@ -10,7 +10,10 @@ from app.core.network_utils import NetworkService
 from app.gui.dashboard import DashboardPage
 from app.gui.diagnostics import DiagnosticsPage
 from app.gui.network_info import NetworkInfoPage
-from app.gui.placeholder import PlaceholderPage
+from app.core.report_service import operation_report
+from app.gui.network_monitor import MonitorPage
+from app.gui.reports import ReportsPage
+from app import __version__
 from app.gui.port_scanner import PortScannerPage
 from app.gui.settings import SettingsPage
 from app.gui.widgets import BG, PANEL, FG, MUTED, CYAN
@@ -98,14 +101,16 @@ class MainWindow(tk.Tk):
         content.pack(side="left", fill="both", expand=True)
         content.rowconfigure(0, weight=1)
         content.columnconfigure(0, weight=1)
+        self.reports = ReportsPage(content, self.settings)
+        self.monitor = MonitorPage(content, self.settings, self.reports)
         self.pages = {
             "Dashboard": DashboardPage(content, self.refresh),
             "Network Information": NetworkInfoPage(content, self.refresh),
-            "Network Diagnostics": DiagnosticsPage(content, self.settings, self._diagnostic_completed),
-            "Port Scanner": PortScannerPage(content, self.settings, self._diagnostic_completed),
-            "Network Monitor": PlaceholderPage(content, "Network monitor", "Phase 5: periodic connectivity checks and monitoring history."),
-            "Reports": PlaceholderPage(content, "Reports", "Phase 5: export results as CSV, TXT, and JSON."),
-            "Settings": SettingsPage(content, self.settings, self.config_service),
+            "Network Diagnostics": DiagnosticsPage(content, self.settings, self._diagnostic_completed, self.record),
+            "Port Scanner": PortScannerPage(content, self.settings, self._diagnostic_completed, self.record),
+            "Network Monitor": self.monitor,
+            "Reports": self.reports,
+            "Settings": SettingsPage(content, self.settings, self.config_service, self.reports.submit, self.apply_settings),
         }
         self.navigation = {}
         for name, page in self.pages.items():
@@ -113,14 +118,29 @@ class MainWindow(tk.Tk):
             button = ttk.Button(sidebar, text=name, command=lambda name=name: self.show_page(name))
             button.pack(fill="x", pady=4)
             self.navigation[name] = button
-        ttk.Label(sidebar, text="v0.4.0 • Phases 1–4\nStandard user access", style="Muted.TLabel").pack(
+        ttk.Label(sidebar, text=f"v{__version__} • Phases 1–5\nStandard user access", style="Muted.TLabel").pack(
             side="bottom", anchor="w", padx=12, pady=12)
         self.show_page("Dashboard")
 
     def _diagnostic_completed(self, timestamp):
         self.pages["Dashboard"].set_last_diagnostic(timestamp)
 
+    def record(self, module, result):
+        self.reports.archive(operation_report(module, result))
+
+    def apply_settings(self, settings):
+        changes = {k: v for k, v in settings.items() if v != self.settings[k]}
+        self.settings.update(settings)
+        self.monitor.apply_defaults(changes)
+        if "ping_count" in changes:
+            self.pages["Network Diagnostics"].views["Ping"]["count"].set(str(settings["ping_count"]))
+
     def show_page(self, name):
+        self.reports.visible = name == "Reports"
+        if self.reports.visible:
+            self.reports.load()
+        if name == "Network Monitor":
+            self.monitor.init_plot()
         self.pages[name].tkraise()
         self.page_title.configure(text=name)
         for title, button in self.navigation.items():
@@ -155,6 +175,7 @@ class MainWindow(tk.Tk):
                 if kind == "snapshot":
                     self.pages["Dashboard"].update_snapshot(data)
                     self.pages["Network Information"].update_snapshot(data)
+                    self.record("Network Information", data)
                     color = CYAN if data["connectivity"] == "Reachable" else "#f5c16c"
                     self.connectivity.configure(text=f"● Internet probe: {data['connectivity']}", foreground=color)
                     self.status.configure(text=f"Updated {data['collected_at']} • {len(data['warnings'])} warning(s)")
@@ -169,9 +190,11 @@ class MainWindow(tk.Tk):
         if self.closing:
             return
         self.closing = True
+        self.withdraw()
         self.cancel.set()
         self.pages["Network Diagnostics"].shutdown()
         self.pages["Port Scanner"].shutdown()
+        self.monitor.shutdown()
         self.after_cancel(self.poll_id)
         self.progress.stop()
         self.refresh_button.configure(state="disabled")
@@ -180,10 +203,18 @@ class MainWindow(tk.Tk):
 
     def _wait_for_worker(self):
         if ((self.worker is not None and self.worker.is_alive()) or
-                self.pages["Network Diagnostics"].is_running() or self.pages["Port Scanner"].is_running()):
+                self.pages["Network Diagnostics"].is_running() or self.pages["Port Scanner"].is_running()
+                or self.monitor.service.running()):
             self.after(50, self._wait_for_worker)
         else:
-            self.destroy()
+            self.monitor.drain()
+            if not self.reports.closing:
+                self.reports.shutdown()
+            if self.reports.is_running():
+                self.after(50, self._wait_for_worker)
+            else:
+                self.reports.finish_shutdown()
+                self.destroy()
 
     def report_callback_exception(self, exc_type, exc_value, traceback):
         LOG.error("GUI callback failed", exc_info=(exc_type, exc_value, traceback))

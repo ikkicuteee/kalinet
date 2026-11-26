@@ -15,9 +15,10 @@ LOG = logging.getLogger("kalinet.scanner.gui")
 
 
 class PortScannerPage(ttk.Frame):
-    def __init__(self, parent, settings, on_complete):
+    def __init__(self, parent, settings, on_complete, on_report=None):
         super().__init__(parent, padding=24)
         self.settings, self.on_complete = settings, on_complete
+        self.on_report = on_report
         self.service = ScannerService()
         self.cancel = threading.Event()
         self.worker = None
@@ -175,6 +176,8 @@ class PortScannerPage(ttk.Frame):
                         f"\nSTDERR\n{result['stderr'][:200000]}\n\nXML\n{result['stdout'][:200000]}")
                     self.status.configure(text=result["error"] or "Scan completed. Results cover only the selected TCP ports.")
                     self.on_complete(result["finished_at"])
+                    if self.on_report:
+                        self.on_report("Port Scanner", result)
                     self.pending_rows = iter(result["ports"])
                     self.rendering = True
                     self._render_rows()

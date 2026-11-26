@@ -17,10 +17,10 @@
 - Explain single-host authorization and run a localhost scan using [Phase 4 acceptance](PHASE4_VERIFICATION.md).
 - Show cancellation and port validation; export the scan as CSV, TXT and JSON.
 
-## Full-project demonstration — blocked on later implementation
+## Monitoring, settings and reports
 
-- Start/stop connectivity monitoring (Phase 5).
-- Demonstrate general reports beyond scan-specific exports (Phase 5).
+- Save a two-second interval, start monitoring loopback and show the graph while navigating.
+- Stop monitoring, export the session, restart KaliNet and reopen the saved result.
 - Record actual test outcomes and finish documentation review (Phase 6).
 
-Do not present placeholder pages as working features. This milestone alone does not satisfy the complete final-project demonstration requirements.
+Record the guest observations using [the Phase 5 procedure](PHASE5_VERIFICATION.md).

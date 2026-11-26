@@ -1,4 +1,4 @@
-# KaliNet user manual — Phases 1–4
+# KaliNet user manual — Phases 1–5
 
 ## Before launching
 
@@ -24,7 +24,7 @@ Tables have vertical and horizontal scrollbars. Read-only details can be selecte
 
 ## Connectivity interpretation
 
-**Reachable** means the single probe to `1.1.1.1` returned successfully. **No ICMP reply** means ping completed without a response. **Unknown** means the probe could not complete, for example because ping was unavailable or hit its command timeout. Inspect warnings before assuming the VM is disconnected. Each refresh sends one real ICMP echo request; there is no periodic background probe in this version.
+**Reachable** means the dashboard probe to `1.1.1.1` succeeded. **No ICMP reply** means ping finished without a response. **Unknown** means the probe could not complete. Network Monitor probes its selected target independently.
 
 ## Network Diagnostics
 
@@ -53,9 +53,21 @@ The Results table shows port, protocol, state, service and version. Details / XM
 
 Select CSV, TXT or JSON and Export Scan, then choose an existing directory. Empty completed results and failed attempts can be exported with metadata and errors. Files receive timestamped unique names and do not overwrite existing reports. CSV includes metadata in each row, including one metadata-only row when empty; potentially executable spreadsheet text is escaped. TXT is a readable summary; JSON retains full XML/stdout/stderr. Readable export failures leave the scan available for retry.
 
-## Settings and remaining pages
+## Network Monitor
 
-Settings shows the configuration path and effective values. Edit that JSON file while KaliNet is closed and restart to apply changes. The README lists accepted values. Invalid files are left intact and defaults are used. Network Monitor and the general Reports page remain placeholders; scan exports are on the Port Scanner page.
+Enter a target and interval in seconds, then select **Start Monitoring**. Each probe sends one ping. The interval starts after the probe finishes. Navigate while it runs. Select **Stop Monitoring** to interrupt a ping or interval wait and archive the session.
+
+The plot displays the latest 60 probes, with gaps for unavailable latency. The history table displays the latest 500 samples. Statistics and exports cover the entire session. Minimum, average and maximum use measured round-trip times. Loss uses packets reported sent and received. Timeouts without counts and local errors appear separately. **Export history CSV** saves a snapshot of the current or last stopped session.
+
+## Reports
+
+Select an operation to display its results. Use **Older** and **Newer** to browse pages of 100. The preview displays up to 80,000 characters. Choose TXT, CSV or JSON and select **Export selected** for the full result. Monitoring CSV contains one row per sample. Other central CSV exports list result fields and values. The scanner also provides its original port-oriented exports.
+
+History is stored in `~/.local/state/kalinet/history.sqlite3` or the configured XDG state directory. History begins with operations performed in v0.5.0. Monitor sessions are archived on Stop or normal shutdown. Exports go to the configured report directory.
+
+## Settings
+
+Set the default ping count, command timeout, monitor interval, target and report directory, then select **Save settings**. The editor checks the values and tests directory write access before saving. In-flight operations keep their original parameters. Future operations use the saved defaults.
 
 ## Closing and errors
 

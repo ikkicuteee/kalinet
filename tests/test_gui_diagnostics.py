@@ -1,4 +1,5 @@
 """Real Tk event-loop tests with mocked services; skip if no desktop is available."""
+import gc
 import threading
 import time
 import tkinter as tk
@@ -13,7 +14,10 @@ from app.utils.command_runner import CommandResult
 
 
 @pytest.fixture
-def window(monkeypatch):
+def window(monkeypatch, tmp_path):
+    # Collect cyclic references from earlier Tk roots on the GUI thread.
+    gc.collect()
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     monkeypatch.setattr("app.gui.main_window.ConfigService.load", lambda self: dict(DEFAULTS))
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     try:
@@ -35,6 +39,8 @@ def window(monkeypatch):
         while exists() and time.monotonic() < deadline:
             app.update()
             time.sleep(.01)
+    del app
+    gc.collect()
 
 
 def pump_until(window, predicate):

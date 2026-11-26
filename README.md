@@ -2,7 +2,7 @@
 
 CIT 244 Linux Final Project. Native Python/Tkinter desktop application for Kali Linux with Xfce, including Kali running inside VMware Workstation.
 
-**Current version: v0.4.0, Phases 1–4.** Dashboard, network information, diagnostics, single-host Nmap scanning and scan exports are implemented. Live Kali scanner acceptance remains pending. Continuous monitoring, general reports and the settings editor remain Phase 5 work. No results are simulated.
+**KaliNet v0.5.0** adds a live ping monitor, persistent operation history and editable settings. See [Phase 5 verification](docs/PHASE5_VERIFICATION.md).
 
 ## Installation on Kali Linux
 
@@ -22,16 +22,17 @@ Python 3.10 or newer is the project target. Run from an active Xfce desktop sess
 
 KaliNet reads `/etc/resolv.conf` and supplements it with `resolvectl dns` and NetworkManager's `nmcli` when available. Missing optional utilities are not dashboard errors. Each source is labeled in Routing & DNS; the combined list may contain both local stub and upstream servers, and is not a claim about resolver priority. Do not install systemd-resolved or change your DNS services for this application.
 
-For an existing installation, update the checkout and install the scanner dependencies:
+To upgrade an existing installation, run these commands inside Kali.
 
 ```bash
-git pull origin main
-sudo apt install -y nmap
+cd ~/kalinet
+git pull --ff-only origin main
+sudo apt install -y nmap python3-tk iputils-ping
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-`defusedxml` is the new Python dependency for safe Nmap XML parsing. Run the application without sudo.
+Matplotlib provides the latency graph. SQLite is included with Kali’s Python.
 
 ## Launch on subsequent sessions
 
@@ -47,7 +48,8 @@ python main.py
 - Hostname; inferred active interface; IPv4 address; default gateway; DNS; interface and listening-socket counts.
 - Interface table with IPv4/IPv6, MAC and operational state.
 - Routing/DNS details, raw link statistics and per-interface traffic counters.
-- A single ICMP Internet probe to `1.1.1.1` on startup and each refresh. It sends real traffic; there is no continuous monitoring yet. No reply may indicate ICMP filtering rather than an Internet outage.
+- The dashboard probes on refresh. Start Network Monitor for periodic probes, measured packet loss, a latency graph and timestamped CSV history.
+- Reports retains completed operations from all four modules for later viewing and export.
 - Partial results with warnings when commands fail; rotating logs; validated JSON configuration.
 - Background collection with a main-thread event queue and shutdown cancellation.
 - Ping with configurable packet count and loss/latency summaries; traceroute with numbered hops; DNS lookup with a record-type selector and response status.
@@ -61,14 +63,15 @@ Listening-socket count includes TCP listeners and UDP bound sockets, with separa
 
 First launch creates `~/.config/kalinet/settings.json`, respecting an absolute `XDG_CONFIG_HOME` override. The packaged `config/default_settings.json` documents the defaults; the application defaults live in `config_service.py`, with a test ensuring the two agree.
 
-Edit the user JSON while the application is closed. Validation requires:
+Edit defaults in Settings and save them for future operations.
 
 | Setting | Allowed values | Current use |
 | --- | --- | --- |
-| `command_timeout` | Integer 1–60 seconds | Network information and diagnostics; scanner has a separate 1–120 second control |
+| `command_timeout` | Integer 1–60 seconds | Snapshot, diagnostics and monitor commands. Scanner timeout is configured separately. |
 | `ping_count` | Integer 1–20 | Default diagnostic packet count |
-| `monitor_interval` | Integer 1–3600 seconds | Reserved for Phase 5 |
-| `report_directory` | Absolute path or `~/…` | Initial directory for scan exports |
+| `monitor_interval` | Integer 1–3600 seconds | Delay after each completed probe |
+| `monitor_target` | Hostname or IP address | Defaults to `127.0.0.1`, including for existing configurations |
+| `report_directory` | Absolute path or `~/…` | Reports and monitor export directory, initial directory for scanner exports |
 | `theme` | `dark` | Current theme |
 
 Invalid configuration is preserved and defaults are loaded with a warning visible in Settings and the log. Settings writes use a temporary file and atomic replacement. Logs reside at `~/.local/state/kalinet/kalinet.log`, respecting an absolute `XDG_STATE_HOME` override; rotation keeps up to three 1 MB backups. Logs may contain local interface details or command errors. No passwords are requested or stored.
@@ -83,17 +86,18 @@ python -m pytest -q
 python -m compileall -q main.py app tests
 ```
 
-Default tests use mocked processes and network counters, with no network probes. They cover validation, diagnostic parsers, DNS providers, socket counts, command lifecycle, safe XML parsing, scan authorization, exports and GUI workers. Tk tests skip when desktop/Tcl initialization is unavailable. An explicitly enabled integration test scans only a temporary localhost listener. See [TEST_PLAN.md](docs/TEST_PLAN.md), [Phase 3 acceptance](docs/PHASE3_VERIFICATION.md), and [Phase 4 acceptance](docs/PHASE4_VERIFICATION.md).
+Tests use mocked measurements for deterministic failure conditions. A real loopback ping test runs on Linux with ping installed. The Nmap integration test requires explicit opt-in. See the [test plan](docs/TEST_PLAN.md).
 
 ## Project map
 
 ```text
 main.py                       Linux entry point
-app/gui/                      Desktop shell, dashboard, network view, placeholders
+app/gui/                      Native desktop shell and seven module views
 app/core/network_utils.py     Linux snapshot collection and parsing
 app/core/diagnostics_service.py Ping/traceroute/dig and result parsing
 app/core/scanner_service.py   Authorized single-address Nmap execution and safe XML parsing
-app/core/report_service.py    Scan CSV/TXT/JSON exports
+app/core/report_service.py    Persistent SQLite history and TXT/CSV/JSON exports
+app/core/monitor_service.py   Serial ping worker, samples and session statistics
 app/core/config_service.py    Configuration validation and persistence
 app/utils/command_runner.py   Safe, bounded, cancellable subprocess execution
 app/utils/validators.py       Single hostname/IP and packet-count validation

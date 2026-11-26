@@ -13,9 +13,10 @@ LOG = logging.getLogger("kalinet.diagnostics")
 
 
 class DiagnosticsPage(ttk.Frame):
-    def __init__(self, parent, settings, on_complete):
+    def __init__(self, parent, settings, on_complete, on_report=None):
         super().__init__(parent, padding=24)
         self.settings, self.on_complete = settings, on_complete
+        self.on_report = on_report
         self.service = DiagnosticsService()
         self.worker = None
         self.cancel = threading.Event()
@@ -122,6 +123,8 @@ class DiagnosticsPage(ttk.Frame):
                              f"STDOUT\n{result['stdout']}\nSTDERR\n{result['stderr']}")
                     view["status"].configure(text=result["error"] or f"Completed at {result['finished_at']}")
                     self.on_complete(result["finished_at"])
+                    if self.on_report:
+                        self.on_report("Network Diagnostics", result)
                 else:
                     view["status"].configure(text=error)
                     set_text(view["summary"], error)

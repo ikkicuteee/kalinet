@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 import tempfile
 
+from app.utils.validators import validate_target
+
 DEFAULTS = {
     "ping_count": 4, "command_timeout": 10, "monitor_interval": 5,
-    "report_directory": "~/Documents/KaliNet Reports", "theme": "dark",
+    "monitor_target": "127.0.0.1", "report_directory": "~/Documents/KaliNet Reports", "theme": "dark",
 }
 LOG = logging.getLogger("kalinet.config")
 
@@ -27,8 +29,13 @@ def validate_settings(values):
     directory = settings["report_directory"]
     if not isinstance(directory, str) or not directory.strip() or "\x00" in directory:
         raise ValueError("Report directory must be a nonempty path.")
-    if not Path(directory).expanduser().is_absolute():
+    try:
+        path = Path(directory).expanduser()
+    except RuntimeError as exc:
+        raise ValueError("Could not resolve the report directory.") from exc
+    if not path.is_absolute():
         raise ValueError("Report directory must be an absolute path (or start with ~/).")
+    settings["monitor_target"] = validate_target(settings["monitor_target"])
     if settings["theme"] != "dark":
         raise ValueError("Only the dark theme is currently supported.")
     return settings

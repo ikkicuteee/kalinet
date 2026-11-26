@@ -2,6 +2,7 @@
   "ping_count": 4,
   "command_timeout": 10,
   "monitor_interval": 5,
+  "monitor_target": "127.0.0.1",
   "report_directory": "~/Documents/KaliNet Reports",
   "theme": "dark"
 }
