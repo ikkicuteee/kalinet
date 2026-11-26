@@ -28,3 +28,19 @@ def validate_count(value):
     if type(value) is not int or not 1 <= value <= 20:
         raise ValueError("Packet count must be an integer from 1 to 20.")
     return value
+
+
+def validate_ports(value):
+    """Accept comma-separated TCP port numbers and inclusive ranges only."""
+    if not isinstance(value, str) or not value or len(value) > 4096:
+        raise ValueError("Enter TCP ports, for example 22,80,443 or 8000-8010 (maximum 4096 characters).")
+    normalized = []
+    for part in value.split(","):
+        part = part.strip()
+        if not re.fullmatch(r"[0-9]{1,5}(?:-[0-9]{1,5})?", part):
+            raise ValueError("Ports must be comma-separated numbers or ascending ranges.")
+        bounds = [int(p) for p in part.split("-")]
+        if any(not 1 <= p <= 65535 for p in bounds) or bounds[0] > bounds[-1]:
+            raise ValueError("Ports must be within 1–65535, with ascending ranges.")
+        normalized.append("-".join(str(p) for p in bounds))
+    return ",".join(normalized)

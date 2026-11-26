@@ -20,6 +20,10 @@ class CommandCancelled(CommandError):
     pass
 
 
+class CommandTimedOut(CommandError):
+    pass
+
+
 @dataclass(frozen=True)
 class CommandResult:
     args: tuple
@@ -63,7 +67,7 @@ class CommandRunner:
                     process.kill()
                     stdout, stderr = process.communicate()
                     reaped = True
-                    raise CommandError(f"{args[0]} timed out after {timeout:g} seconds.",
+                    raise CommandTimedOut(f"{args[0]} timed out after {timeout:g} seconds.",
                                        CommandResult(tuple(args), process.returncode, stdout, stderr))
                 try:
                     stdout, stderr = process.communicate(timeout=min(0.15, remaining))

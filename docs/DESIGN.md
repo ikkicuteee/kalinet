@@ -4,7 +4,7 @@
 
 Students diagnosing a Kali VM network must otherwise move between several terminal utilities and interpret their output independently. KaliNet presents these observations in a single native desktop interface, makes failures readable, and keeps network operations separate from presentation.
 
-The complete project aims to support configuration inspection, connectivity diagnostics, authorized single-host scanning, periodic monitoring and exportable reports without requiring manual terminal commands for normal use. This milestone implements the desktop foundation, configuration inspection and Phase 3 diagnostics; live Kali acceptance is pending.
+The complete project aims to support configuration inspection, connectivity diagnostics, authorized single-host scanning, periodic monitoring and exportable reports without requiring manual terminal commands for normal use. This milestone implements Phases 1–4, including Nmap scans and scan-specific exports. Live Kali scanner acceptance is pending.
 
 ## Requirements and milestone boundaries
 
@@ -14,8 +14,8 @@ The complete project aims to support configuration inspection, connectivity diag
 | Dashboard | Host, interface, address, gateway, DNS, connectivity and counts | Implemented; diagnostic timestamp tracks last completed attempt |
 | Network information | Addresses, MAC, states, routing, DNS and traffic counters | Implemented |
 | Diagnostics | Validated ping, traceroute and DNS lookup | Implemented; Kali acceptance pending |
-| Scanner | Authorized literal single-IP Nmap scan, XML, cancellation | Phase 4 |
-| Monitor/reports | Periodic history, CSV/TXT/JSON exports | Phase 5 |
+| Scanner | Authorized single-host Nmap scan, safe XML, cancellation | Implemented; Kali acceptance pending |
+| Monitor/general reports | Periodic history and general exports | Phase 5; scan-specific exports are implemented |
 | Settings | Per-user JSON configuration, validation, editor | Persistence implemented; editor Phase 5 |
 
 Nonfunctional requirements include least privilege, bounded subprocess lifetime, no shell execution, no worker-thread Tk calls, readable errors, logs, modular code, and documented evidence of testing. Live Linux observations are never replaced with sample results.
@@ -73,7 +73,11 @@ Missing information is shown as unavailable. The GUI does not infer zero listene
 
 Diagnostics validate a single ASCII hostname or IPv4/IPv6 literal before constructing argument lists. Prefix options, shell syntax, URLs, ranges and scoped IPv6 input are rejected. A separate diagnostics worker communicates through a queue and supports cancellation; application shutdown waits for both collection and diagnostic workers. The command runner preserves captured output on timeout, cancellation and nonzero exit. Parsers extract packet summaries, hop observations and DNS answer records while retaining raw output. DNS response codes are checked independently of dig's process exit status. One diagnostic is allowed at a time.
 
-Later scans will accept loopback or one literal IP address, require explicit authorization for non-loopback targets, use unprivileged TCP connect scans and safe XML parsing, and forbid ranges, stealth/exploits and credentials. Scanning remains unimplemented and Phase 4 must wait for Phase 3 verification.
+`ScannerService` validates targets, modes, timeout and ports, and requires authorization for non-loopback targets independently of the GUI. Hostname resolution runs in a bounded, cancellable Python child; exactly one returned IP (IPv4 preferred) is passed to Nmap. The scan uses `--unprivileged -sT -Pn -n -oX -`, optionally `-6`, `-F`, `-p` or `-sV`. No raw option input, scripts, exploitation, credential operations or host ranges are exposed. A service lock and GUI busy state prevent concurrent scans. Scan timeout is a total 1–120 seconds including DNS resolution.
+
+`defusedxml` rejects entity expansion/external entities. Parsing enforces the Nmap root, a successful completion marker, at most one host and valid TCP port entries; XML over 16 MB is rejected. Grouped states are retained separately. Truncated/cancelled XML remains raw diagnostic output and does not produce a completed result or zero open count. A typed timeout exception extends the existing runner without changing diagnostics behavior.
+
+`PortScannerPage` follows the existing queue/worker design, batches large result tables and limits visible output previews. `report_service.py` exports scan metadata and results only, in a worker, to exclusive timestamped unique files. CSV escapes formula-like untrusted values; JSON preserves full output. The general Reports page remains Phase 5. Window closure cancels the scan and waits for all workers. The user explicitly authorized Phase 4 on 2026-11-26; that authorization does not establish prior live test results.
 
 ## Visual design
 

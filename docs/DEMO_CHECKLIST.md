@@ -13,13 +13,14 @@
 - Show Settings and the per-user log; close during refresh to demonstrate cleanup.
 - Run Ping on `127.0.0.1` and `::1`, Traceroute on `127.0.0.1`, and DNS Lookup on `example.com`.
 - Show parsed results and raw outputs; reject `example.com; id` without starting a command.
-- Stop a long diagnostic and navigate during execution. Complete [Phase 3 acceptance](PHASE3_VERIFICATION.md) before Phase 4.
+- Stop a long diagnostic and navigate during execution. Complete [Phase 3 acceptance](PHASE3_VERIFICATION.md).
+- Explain single-host authorization and run a localhost scan using [Phase 4 acceptance](PHASE4_VERIFICATION.md).
+- Show cancellation and port validation; export the scan as CSV, TXT and JSON.
 
 ## Full-project demonstration — blocked on later implementation
 
-- Explain single-host authorization rules and perform an authorized localhost scan (Phase 4).
 - Start/stop connectivity monitoring (Phase 5).
-- Export a report and open the exported CSV/TXT/JSON (Phase 5).
+- Demonstrate general reports beyond scan-specific exports (Phase 5).
 - Record actual test outcomes and finish documentation review (Phase 6).
 
 Do not present placeholder pages as working features. This milestone alone does not satisfy the complete final-project demonstration requirements.

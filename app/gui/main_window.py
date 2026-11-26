@@ -11,6 +11,7 @@ from app.gui.dashboard import DashboardPage
 from app.gui.diagnostics import DiagnosticsPage
 from app.gui.network_info import NetworkInfoPage
 from app.gui.placeholder import PlaceholderPage
+from app.gui.port_scanner import PortScannerPage
 from app.gui.settings import SettingsPage
 from app.gui.widgets import BG, PANEL, FG, MUTED, CYAN
 from app.utils.command_runner import CommandCancelled
@@ -101,7 +102,7 @@ class MainWindow(tk.Tk):
             "Dashboard": DashboardPage(content, self.refresh),
             "Network Information": NetworkInfoPage(content, self.refresh),
             "Network Diagnostics": DiagnosticsPage(content, self.settings, self._diagnostic_completed),
-            "Port Scanner": PlaceholderPage(content, "Port scanner", "Phase 4: authorized single-host Nmap scans, XML results, and cancellation."),
+            "Port Scanner": PortScannerPage(content, self.settings, self._diagnostic_completed),
             "Network Monitor": PlaceholderPage(content, "Network monitor", "Phase 5: periodic connectivity checks and monitoring history."),
             "Reports": PlaceholderPage(content, "Reports", "Phase 5: export results as CSV, TXT, and JSON."),
             "Settings": SettingsPage(content, self.settings, self.config_service),
@@ -112,7 +113,7 @@ class MainWindow(tk.Tk):
             button = ttk.Button(sidebar, text=name, command=lambda name=name: self.show_page(name))
             button.pack(fill="x", pady=4)
             self.navigation[name] = button
-        ttk.Label(sidebar, text="v0.3.0 • Phases 1–3\nStandard user access", style="Muted.TLabel").pack(
+        ttk.Label(sidebar, text="v0.4.0 • Phases 1–4\nStandard user access", style="Muted.TLabel").pack(
             side="bottom", anchor="w", padx=12, pady=12)
         self.show_page("Dashboard")
 
@@ -170,6 +171,7 @@ class MainWindow(tk.Tk):
         self.closing = True
         self.cancel.set()
         self.pages["Network Diagnostics"].shutdown()
+        self.pages["Port Scanner"].shutdown()
         self.after_cancel(self.poll_id)
         self.progress.stop()
         self.refresh_button.configure(state="disabled")
@@ -177,7 +179,8 @@ class MainWindow(tk.Tk):
         self._wait_for_worker()
 
     def _wait_for_worker(self):
-        if (self.worker is not None and self.worker.is_alive()) or self.pages["Network Diagnostics"].is_running():
+        if ((self.worker is not None and self.worker.is_alive()) or
+                self.pages["Network Diagnostics"].is_running() or self.pages["Port Scanner"].is_running()):
             self.after(50, self._wait_for_worker)
         else:
             self.destroy()

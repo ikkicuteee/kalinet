@@ -12,8 +12,12 @@ Run `python -m pytest -q` and `python -m compileall -q main.py app tests` from t
 | `test_validators.py` | IPv4/IPv6/hostname acceptance, malformed inputs, injection/option rejection, packet counts |
 | `test_diagnostics.py` | Command arguments, ping statistics, hops, DNS answers/status/NODATA, malformed output, partial timeout and error reporting |
 | `test_gui_diagnostics.py` | Real Tk event loop with mocked services: results, timestamp, input rejection, navigation, duplicate-run prevention, cancellation and shutdown |
+| `test_scanner.py` | Ports/authorization, single-IP hostname pinning, unprivileged arguments, safe XML, missing Nmap, empty results, timeout/cancellation and scan lock |
+| `test_reports.py` | CSV/TXT/JSON scan exports, metadata for empty results, formula escaping, permission failures and unique filenames |
+| `test_gui_scanner.py` | Scan results, exports, repeated authorization, navigation, duplicate-run prevention, cancellation, shutdown and batched table rendering |
+| `test_scanner_integration.py` | Opt-in real Nmap scan of a temporary localhost TCP listener |
 
-No live network is required by these tests. Mocked command results validate service logic, not actual Linux utility compatibility. Tk tests skip when desktop/Tcl initialization is unavailable; they do not replace an Xfce visual review. Nmap parsing and report tests belong to later phases. Follow [PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md) for diagnostic acceptance and the `ss -tuln` comparison.
+No live network is required by the default tests. Mocked command results validate service logic, not actual Linux utility compatibility. Tk tests skip when desktop/Tcl initialization is unavailable; they do not replace an Xfce visual review. Follow [PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md) for diagnostics and [PHASE4_VERIFICATION.md](PHASE4_VERIFICATION.md) for scan acceptance. Only `KALINET_LIVE_TESTS=1` on Linux with Nmap enables the integration test, which scans localhost only.
 
 ## Kali Linux manual acceptance
 
@@ -61,3 +65,16 @@ Executed on the same Windows Python 3.14.5 host after the Phase 3 changes:
 The full suite used `-p no:cacheprovider` and a newly allocated `--basetemp` path because pre-existing Windows pytest/cache directories had incompatible access permissions. Earlier setup/teardown errors were addressed before the final run. GUI tests exercised real Tk widgets and event-loop callbacks with mocked diagnostic services, not live Linux utilities.
 
 The user reported a working v0.2.0 dashboard in Kali; this session did not independently inspect that VM. **The guest's zero-socket observation has not been verified against live `ss -tuln`.** The original selection flags are equivalent; revised parsing, retained raw output and a controlled listener procedure make the comparison testable. **Live Phase 3 Kali/Xfce acceptance remains pending.** Do not proceed to Phase 4 until the acceptance procedure is completed and reviewed.
+
+### Phase 4 verification — 2026-11-26
+
+The user explicitly authorized Phase 4 implementation on this date, superseding the earlier development gate without asserting new live Kali test results.
+
+- Full suite on Windows/Python 3.14.5: **165 passed, 1 skipped in 3.62s**.
+- The skipped test is the explicitly gated Linux/Nmap localhost integration test. Nmap is absent from this development host; no actual Nmap scan was executed here.
+- All diagnostics and scanner Tk GUI tests passed in the final run, including cancellation, authorization, shutdown, export and batched table rendering. An earlier run skipped one diagnostics GUI test due to the existing intermittent host Tcl initialization issue.
+- `python -m compileall -q main.py app tests`: passed.
+- `git diff --check`: passed.
+- Tests used a fresh temporary directory and `-p no:cacheprovider` to avoid pre-existing Windows cache permission issues.
+
+Kali/Xfce visual acceptance and actual Nmap behavior remain pending. Run the Phase 4 acceptance procedure, including `KALINET_LIVE_TESTS=1 python -m pytest -q tests/test_scanner_integration.py`, inside Kali and record actual results. Phase 5 is not implemented and must wait for instruction.

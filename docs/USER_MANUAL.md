@@ -1,4 +1,4 @@
-# KaliNet user manual — Phases 1–3
+# KaliNet user manual — Phases 1–4
 
 ## Before launching
 
@@ -36,9 +36,26 @@ Select Ping, Traceroute, or DNS Lookup within the existing Network Diagnostics p
 
 Parsed results and Raw output are separate tabs. Raw output includes command arguments, exit status, stdout and stderr. Output appears on completion or cancellation, not as a live stream. Select Stop to cancel; commands also stop when the window closes. One diagnostic runs at a time, while sidebar navigation and dashboard refresh remain usable. The Settings command timeout (default 10 seconds, maximum 60) applies to the whole command; partial traceroutes are common on longer paths. Missing utilities produce a readable error; install `traceroute` and `dnsutils` as shown in the README.
 
+## Port Scanner
+
+Default target is `127.0.0.1`. Enter a single IPv4/IPv6 address or ASCII hostname, select a mode, and click Start Scan. Each non-loopback target prompts for explicit permission to scan that lab host. Declining starts no command. `localhost` maps to `127.0.0.1`; enter `::1` to test IPv6. Other hostnames resolve to exactly one address, preferring IPv4. The selected address is displayed and exported. Host ranges, CIDRs, URLs and command options are unsupported.
+
+- **Quick:** Nmap `-F` common TCP port selection.
+- **Standard:** Nmap's default TCP port selection.
+- **Custom TCP:** comma-separated ports and ascending port ranges, e.g. `22,443,8000-8010`, within 1–65535. This field is ignored for other modes.
+- **Service detection:** adds `-sV`; may take substantially longer and does not guarantee a version for every service.
+
+All scans use `--unprivileged -sT -Pn -n`. Host discovery is skipped so blocked discovery probes do not prevent a TCP scan. Consequently an Nmap “up” status does not establish reachability. The result covers only selected ports; no open ports is not a claim that the host has no services.
+
+The scanner has its own timeout of 1–120 seconds, initially 120, covering resolution plus scanning. Cancel Scan terminates the current command. The window remains navigable; a second scan is blocked until the first finishes. The spinner shows activity, not a completion percentage. Results appear after completion, not live. Large tables are inserted in batches. Window closure cancels scans and waits for workers, including any export already in progress.
+
+The Results table shows port, protocol, state, service and version. Details / XML shows timestamps, command, grouped states and stderr/XML previews (up to 200,000 characters each). Nmap may summarize closed/filtered ports without listing individual numbers; those summaries appear under grouped states. Failed, timed-out and cancelled scans have an unavailable open count rather than a misleading zero. Truncated XML is not treated as a completed result.
+
+Select CSV, TXT or JSON and Export Scan, then choose an existing directory. Empty completed results and failed attempts can be exported with metadata and errors. Files receive timestamped unique names and do not overwrite existing reports. CSV includes metadata in each row, including one metadata-only row when empty; potentially executable spreadsheet text is escaped. TXT is a readable summary; JSON retains full XML/stdout/stderr. Readable export failures leave the scan available for retry.
+
 ## Settings and remaining pages
 
-Settings shows the configuration path and effective values. Edit that JSON file while KaliNet is closed and restart to apply changes. The README lists accepted values. Invalid files are left intact and defaults are used. Port Scanner, Network Monitor and Reports remain labeled placeholders.
+Settings shows the configuration path and effective values. Edit that JSON file while KaliNet is closed and restart to apply changes. The README lists accepted values. Invalid files are left intact and defaults are used. Network Monitor and the general Reports page remain placeholders; scan exports are on the Port Scanner page.
 
 ## Closing and errors
 
@@ -46,4 +63,4 @@ Close the window normally. If collection is running, the status changes to “St
 
 ## Project submission
 
-Fill in the author/course placeholders in the README. Use the milestone demonstration checklist now; reserve the full-project diagnostics, scan and export demonstration until their implementation and Kali validation are complete.
+Fill in the author/course placeholders in the README. Complete the Kali acceptance procedures before presenting diagnostics, scans and exports as verified on that system.
